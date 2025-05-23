@@ -1,0 +1,1 @@
+normal: [('conv_3x3', 0), ('conv_5x5', 1), ('max_pool', 2), ('lstm', 3), ('gru', 4), ('identity', 5), ('conv_5x5', 6), ('avg_pool', 7)] normal_concat: [2, 4, 6] reduce: [('max_pool', 0), ('avg_pool', 1), ('conv_3x3', 2), ('identity', 3), ('lstm', 4), ('gru', 5), ('conv_5x5', 6), ('none', 7)] reduce_concat: [2, 4, 6]

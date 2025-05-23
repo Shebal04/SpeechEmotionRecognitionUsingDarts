@@ -1,0 +1,426 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech Emotion Recognition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-section.active {
+            border-color: #3498db;
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin: 20px 0;
+        }
+        
+        .file-input-button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            border: none;
+        }
+        
+        .file-input-button:hover {
+            background-color: #2980b9;
+        }
+        
+        #fileInput {
+            position: absolute;
+            font-size: 100px;
+            right: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        #selectedFileName {
+            margin-top: 10px;
+            color: #7f8c8d;
+        }
+        
+        #predictButton {
+            background-color: #2ecc71;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: block;
+            margin: 20px auto;
+            width: 200px;
+        }
+        
+        #predictButton:hover {
+            background-color: #27ae60;
+        }
+        
+        #predictButton:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        .result-section {
+            margin-top: 30px;
+            text-align: center;
+            display: none;
+        }
+        
+        .emotion-result {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        
+        .chart-container {
+            margin: 30px auto;
+            height: 300px;
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .emotion-icon {
+            font-size: 48px;
+            margin: 10px;
+        }
+        
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        .instructions {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .emotion-colors {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .emotion-color {
+            margin: 5px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 Speech Emotion Recognition</h1>
+        
+        <div class="instructions">
+            <p>Upload a WAV audio file containing speech to detect the emotional tone. For best results, use clear audio with a single speaker expressing a distinct emotion.</p>
+        </div>
+        
+        <div class="upload-section" id="uploadSection">
+            <div class="file-input-wrapper">
+                <button class="file-input-button">Choose WAV File</button>
+                <input type="file" id="fileInput" accept=".wav">
+            </div>
+            <div id="selectedFileName">No file selected</div>
+        </div>
+        
+        <button id="predictButton" disabled>Analyze Emotion</button>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="loader" id="loader"></div>
+        
+        <div class="result-section" id="resultSection">
+            <h2>Analysis Results</h2>
+            <div class="emotion-icon" id="emotionIcon"></div>
+            <div class="emotion-result" id="emotionResult"></div>
+            <div class="chart-container">
+                <canvas id="emotionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Emotion colors and icons mapping
+        const emotionData = {
+            'neutral': { color: '#95a5a6', icon: '😐' },
+            'calm': { color: '#3498db', icon: '😌' },
+            'happy': { color: '#f1c40f', icon: '😄' },
+            'sad': { color: '#9b59b6', icon: '😢' },
+            'angry': { color: '#e74c3c', icon: '😠' },
+            'fearful': { color: '#7f8c8d', icon: '😨' },
+            'disgust': { color: '#2ecc71', icon: '🤢' },
+            'surprised': { color: '#e67e22', icon: '😲' }
+        };
+        
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const selectedFileName = document.getElementById('selectedFileName');
+        const predictButton = document.getElementById('predictButton');
+        const resultSection = document.getElementById('resultSection');
+        const emotionResult = document.getElementById('emotionResult');
+        const emotionIcon = document.getElementById('emotionIcon');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('errorMessage');
+        const uploadSection = document.getElementById('uploadSection');
+        
+        // Chart variables
+        let emotionChart = null;
+        
+        // Event listeners
+        fileInput.addEventListener('change', handleFileSelect);
+        predictButton.addEventListener('click', analyzeEmotion);
+        
+        // Upload section drag and drop functionality
+        uploadSection.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadSection.classList.add('active');
+        });
+        
+        uploadSection.addEventListener('dragleave', function() {
+            uploadSection.classList.remove('active');
+        });
+        
+        uploadSection.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadSection.classList.remove('active');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+        
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            
+            if (file) {
+                // Check if the file is a WAV file
+                if (file.name.toLowerCase().endsWith('.wav')) {
+                    selectedFileName.textContent = file.name;
+                    predictButton.disabled = false;
+                    hideError();
+                } else {
+                    selectedFileName.textContent = 'Invalid file format. Please select a WAV file.';
+                    predictButton.disabled = true;
+                    showError('Please select a valid WAV file.');
+                }
+            } else {
+                selectedFileName.textContent = 'No file selected';
+                predictButton.disabled = true;
+            }
+        }
+        
+        function analyzeEmotion() {
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            // Reset UI
+            hideError();
+            resultSection.style.display = 'none';
+            loader.style.display = 'block';
+            predictButton.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Error processing the file');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayResults(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError(error.message || 'An error occurred during analysis.');
+            })
+            .finally(() => {
+                loader.style.display = 'none';
+                predictButton.disabled = false;
+            });
+        }
+        
+        function displayResults(data) {
+    const emotion = data.prediction;
+    console.log("Received prediction:", emotion);
+    console.log("All scores:", data.all_scores);
+    
+    const emotionStyle = emotionData[emotion] || { color: '#95a5a6', icon: '❓' };
+    
+    // Display emotion result
+    emotionResult.textContent = `Detected Emotion: ${emotion.toUpperCase()}`;
+    emotionResult.style.backgroundColor = emotionStyle.color + '30'; // Add transparency
+    emotionResult.style.color = adjustTextColor(emotionStyle.color);
+    emotionIcon.textContent = emotionStyle.icon;
+    
+    // Create or update chart
+    createEmotionChart(data.all_scores);
+    
+    // Show result section
+    resultSection.style.display = 'block';
+}
+        
+        function createEmotionChart(emotionScores) {
+            const ctx = document.getElementById('emotionChart').getContext('2d');
+            
+            // Prepare data
+            const labels = Object.keys(emotionScores);
+            const values = Object.values(emotionScores);
+            const backgroundColors = labels.map(label => emotionData[label]?.color || '#95a5a6');
+            
+            // Destroy previous chart if it exists
+            if (emotionChart) {
+                emotionChart.destroy();
+            }
+            
+            // Create new chart
+            emotionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Confidence Score',
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderColor: 'rgba(255, 255, 255, 0.6)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.raw.toFixed(4);
+                                    return `${label}: ${value}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            title: {
+                                display: true,
+                                text: 'Confidence Score'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Emotion'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+        
+        function adjustTextColor(bgColor) {
+            // Convert hex to RGB
+            const r = parseInt(bgColor.slice(1, 3), 16);
+            const g = parseInt(bgColor.slice(3, 5), 16);
+            const b = parseInt(bgColor.slice(5, 7), 16);
+            
+            // Calculate brightness (YIQ equation)
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            
+            // Return black or white depending on brightness
+            return brightness > 128 ? '#000000' : '#ffffff';
+        }
+    </script>
+</body>
+</html>
